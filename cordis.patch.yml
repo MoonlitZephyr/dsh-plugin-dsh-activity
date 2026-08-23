@@ -1,0 +1,12 @@
+# dsh-plugin-dsh-activity bundle patch: contributes the plugin row into the
+# host composition when this package is installed via `dsh plugin add`.
+#
+# The plugin is HOST-PLANE: it reads host services (fs, sessionPersistence,
+# llm, sessions, sessionTitle, timer, webServer) and serves its snapshots
+# over HTTP routes, and its client half registers a root-scoped settings
+# page. It must therefore land in the host composition (this insert), never
+# inside an agent preset.
+
+- insert:
+    - id: dsh-activity
+      name: 'dsh-plugin-dsh-activity'
