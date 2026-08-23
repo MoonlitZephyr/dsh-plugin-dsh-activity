@@ -19,6 +19,12 @@ DeepSeek Harness 用量监控插件：对话 / 技能 / 工具 / Token 全链路
 ### 月视图
 ![月视图](assets/month-view.png)
 
+### 界面截图
+![截图 1](assets/screenshot-1.png)
+![截图 2](assets/screenshot-2.png)
+![截图 3](assets/screenshot-3.png)
+![截图 4](assets/screenshot-4.png)
+
 ## 架构
 
 ```
