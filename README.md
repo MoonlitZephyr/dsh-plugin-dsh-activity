@@ -54,3 +54,9 @@ dsh plugin --profile web add file:<本目录绝对路径>
 ## License
 
 MIT
+
+## 兼容性（dsh 0.2.x / 桌面版）
+
+- 要求 dsh `>=0.2.1-rc.2 <0.3.0`（`engines.dsh`，0.2.1 起声明）。
+- 宿主路由 `/dsh-activity/snapshot`、`/dsh-activity/models`、`/dsh-activity/calendar` 均为相对路径；桌面版把 `dsh-app://app` 下的未知路径转发给本地 host，因此同样可用。
+- 安装：包名加入 `dsh.profile.bundles`（自带 `dsh.bundle.patch`）。
