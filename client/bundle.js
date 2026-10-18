@@ -100,9 +100,9 @@ window.__ModuleLoader__.load({
     function fmt(n) { return (typeof n === "number" && isFinite(n) ? n : 0).toLocaleString("en-US") }
     function fmtShort(n) {
       if (!n) return "0"
-      if (n >= 1e9) return (n / 1e9).toFixed(2) + "B"
-      if (n >= 1e6) return (n / 1e6).toFixed(2) + "M"
-      if (n >= 1e3) return (n / 1e3).toFixed(1) + "K"
+      if (n >= 1e9) return (n / 1e9).toFixed(2).replace(/\.?0+$/, "") + "B"
+      if (n >= 1e6) return (n / 1e6).toFixed(2).replace(/\.?0+$/, "") + "M"
+      if (n >= 1e3) return (n / 1e3).toFixed(1).replace(/\.0$/, "") + "K"
       return String(n)
     }
     function fmtDur(ms) {
