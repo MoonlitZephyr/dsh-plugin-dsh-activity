@@ -28,11 +28,18 @@ module.exports = {
   inject: ['timer', 'webServer'],
 
   apply(ctx) {
-    const fs = ctx.get('fs')
-    const sessionPersistence = ctx.get('sessionPersistence')
-    const llm = ctx.get('llm')
-    const sessionsSvc = ctx.get('sessions')
-    const sessionTitle = ctx.get('sessionTitle')
+    // Services are resolved lazily. The host composition may mount a service
+    // after this plugin's apply() runs; capturing it here pinned `undefined`
+    // for the whole process lifetime and silently disabled persistence after
+    // the 2026-10 runtime upgrade.
+    const fsSync = require('node:fs')
+    const os = require('node:os')
+    const path = require('node:path')
+    const getFs = () => ctx.get('fs')
+    const getPersistence = () => ctx.get('sessionPersistence')
+    const getLlm = () => ctx.get('llm')
+    const getSessions = () => ctx.get('sessions')
+    const getSessionTitle = () => ctx.get('sessionTitle')
 
     // state: hours 'YYYY-MM-DDTHH' -> {out,inp,calls,models}; days 'YYYY-MM-DD' -> freshDay()
     const state = { v: 1, hours: {}, days: {} }
@@ -120,15 +127,28 @@ module.exports = {
     function resolveHome() {
       if (homePromise) return homePromise
       homePromise = (async () => {
+        // 1) the conventional home, no host service required: an explicit
+        //    DSH_HOME override, else <os.homedir>/.dsh (where storages/ lives).
         try {
-          if (!sessionPersistence || typeof sessionPersistence.list !== 'function') return null
-          const headers = await sessionPersistence.list()
+          const env = process.env.DSH_HOME
+          if (typeof env === 'string' && env.length > 0) return env
+          const home = path.join(os.homedir(), '.dsh')
+          if (fsSync.existsSync(path.join(home, 'storages'))) return home
+          if (fsSync.existsSync(home)) return home
+        } catch (e) { /* fall through to the service-based derivation */ }
+        // 2) legacy derivation from a session file path (service APIs differ
+        //    between runtimes, so every call is guarded).
+        try {
+          const persistence = getPersistence()
+          if (!persistence || typeof persistence.list !== 'function') return null
+          const headers = await persistence.list()
           if (!Array.isArray(headers)) return null
           for (const h of headers) {
             try {
-              const loc = sessionPersistence.locate(h)
-              if (loc && typeof loc.path === 'string' && loc.path.length) {
-                const parts = loc.path.split(/[\\/]sessions[\\/]/)
+              const loc = typeof persistence.locate === 'function' ? persistence.locate(h) : undefined
+              const p = loc && typeof loc.path === 'string' ? loc.path : ''
+              if (p.length) {
+                const parts = p.split(/[\\/]sessions[\\/]/)
                 if (parts.length >= 2 && parts[0].length) return parts[0]
               }
             } catch (e) { /* try next header */ }
@@ -148,7 +168,9 @@ module.exports = {
     async function ensurePersistTarget() {
       if (persistTarget) return persistTarget
       const home = await resolveHome()
-      if (!home || !fs) return null
+      const fs = getFs()
+      if (!home) { console.log('dsh-activity: cannot resolve the DSH home; keeping stats in memory only'); return null }
+      if (!fs) { console.log('dsh-activity: fs service not mounted yet; persistence deferred'); return null }
       try { persistTarget = await fs.resolve(home + '\\storages\\dsh-activity-usage.json') } catch (e) { persistTarget = null }
       return persistTarget
     }
@@ -160,7 +182,12 @@ module.exports = {
         loadPromise = (async () => {
           try {
             const target = await ensurePersistTarget()
-            if (!target) return state
+            // A missing target/fs must not cache a "loaded nothing" promise for
+            // the rest of the process: reset so the next caller retries once the
+            // service is mounted (and never let persist overwrite history).
+            if (!target) { loadPromise = null; return state }
+            const fs = getFs()
+            if (!fs) { loadPromise = null; return state }
             const text = await fs.readText(target)
             if (!text) return state
             let parsed = null
@@ -233,6 +260,8 @@ module.exports = {
       try {
         const target = await ensurePersistTarget()
         if (!target) { dirty = true; return }
+        const fs = getFs()
+        if (!fs) { dirty = true; return }
         await loadState()
         prune()
         await fs.writeText(target, JSON.stringify(state), undefined, undefined, { mode: 'danger-full-access' })
@@ -385,6 +414,7 @@ module.exports = {
     async function providerNames() {
       const map = {}
       try {
+        const llm = getLlm()
         if (llm && typeof llm.listProviders === 'function') {
           const list = llm.listProviders()
           if (list && Array.isArray(list)) for (const p of list) map[p.id] = p.name || p.id
@@ -403,6 +433,8 @@ module.exports = {
         const srec = db.sessions[sid]
         let title = ''
         try {
+          const sessionsSvc = getSessions()
+          const sessionTitle = getSessionTitle()
           if (sessionsSvc && sessionTitle && typeof sessionsSvc.get === 'function' && typeof sessionTitle.get === 'function') {
             const sess = sessionsSvc.get(sid)
             if (sess) { const snap = sessionTitle.get(sess); if (snap && typeof snap.title === 'string') title = snap.title }

@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-dsh-activity",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "DSH 活动统计：对话/技能/Token 用量监控、六项今日统计、日(24h)/月/年热力图。月热力图按星期对齐并支持任意月份导航；年热力图为 GitHub 风格周列网格并支持年份导航；支持 Token/调用次数指标切换、周期合计与按供应商→模型查看用量，数据持久化到 ~/.dsh/storages。",
   "license": "MIT",
   "repository": {
@@ -31,7 +31,8 @@
     "cordis.patch.yml"
   ],
   "scripts": {
-    "check": "node --check src/index.js && node --check client/bundle.js"
+    "check": "node --check src/index.js && node --check client/bundle.js",
+    "test": "node test/persist.test.mjs"
   },
   "engines": {
     "node": ">=20",

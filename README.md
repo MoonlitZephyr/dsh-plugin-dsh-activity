@@ -60,3 +60,12 @@ MIT
 - 要求 dsh `>=0.2.1-rc.2 <0.3.0`（`engines.dsh`，0.2.1 起声明）。
 - 宿主路由 `/dsh-activity/snapshot`、`/dsh-activity/models`、`/dsh-activity/calendar` 均为相对路径；桌面版把 `dsh-app://app` 下的未知路径转发给本地 host，因此同样可用。
 - 安装：包名加入 `dsh.profile.bundles`（自带 `dsh.bundle.patch`）。
+
+### 0.2.2 — 修复「只记得今天的活动」
+
+- **根因**：宿主在 `apply()` 里一次性捕获 `fs` / `sessionPersistence`。0.2.x 起这两个服务在本插件 `apply()` 之后才挂载，捕获到的是 `undefined`
+  → `ensurePersistTarget()` 永远返回 `null` → 每天只写内存，`~/.dsh/storages/dsh-activity-usage.json` 自 2026-09-10 之后就没再被写过。
+- 改为**惰性解析**：`getFs()` / `getPersistence()` / `getLlm()` / `getSessions()` / `getSessionTitle()` 每次用时再取。
+- 主目录解析改为**不依赖宿主服务**：`DSH_HOME` → `<os.homedir>/.dsh`（确认 `storages/` 存在），都失败才回落到旧的服务推导；失败会打一行日志。
+- `loadState()` 在目标/服务缺失时**不再缓存"什么都没读到"的 promise**，下次调用会重试，避免永久停在内存模式。
+- 自检：`test/persist.test.mjs` —— 模拟"服务晚于 apply 挂载"的真实顺序，断言会写出当天的桶、并且**保留旧历史**（用 2026-09-10 的数据做对照）。旧版跑这个用例直接挂掉。
